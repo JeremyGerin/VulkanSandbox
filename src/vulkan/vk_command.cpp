@@ -33,7 +33,7 @@ std::vector<VkCommandBuffer> create_command_buffers(VkDevice device, VkCommandPo
     return buffers;
 }
 
-void record_command_buffer(VkCommandBuffer command_buffer, VkRenderPass render_pass, VkFramebuffer framebuffer, VkExtent2D extent, VkPipeline pipeline, VkBuffer vertex_buffer, uint32_t vertex_count) {
+void record_command_buffer(VkCommandBuffer command_buffer, VkRenderPass render_pass, VkFramebuffer framebuffer, VkExtent2D extent, VkPipeline pipeline, VkBuffer vertex_buffer, uint32_t vertex_count, const std::function<void(VkCommandBuffer)>& extra_draw) {
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -62,6 +62,10 @@ void record_command_buffer(VkCommandBuffer command_buffer, VkRenderPass render_p
     vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
 
     vkCmdDraw(command_buffer, vertex_count, 1, 0, 0);
+
+    if (extra_draw) {
+        extra_draw(command_buffer);
+    }
 
     vkCmdEndRenderPass(command_buffer);
 

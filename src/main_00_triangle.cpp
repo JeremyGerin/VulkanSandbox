@@ -45,6 +45,9 @@ int main_00_triangle() {
     if (render_pass == VK_NULL_HANDLE) { unwind(cleanup); return EXIT_FAILURE; }
     cleanup.push_back([&]{ vkDestroyRenderPass(logical_device.device, render_pass, nullptr); });
 
+    ImGuiHandles imgui_handles = init_imgui(window, instance, physical_device, logical_device.device, indices.graphics_family.value(), logical_device.graphics_queue, render_pass, static_cast<uint32_t>(swapchain.images.size()));
+    cleanup.push_back([&]{ shutdown_imgui(logical_device.device, imgui_handles); });
+
     GraphicsPipeline graphics_pipeline = create_graphics_pipeline(logical_device.device, render_pass, swapchain.extent);
     if (graphics_pipeline.pipeline == VK_NULL_HANDLE) { unwind(cleanup); return EXIT_FAILURE; }
     cleanup.push_back([&]{ destroy_graphics_pipeline(logical_device.device, graphics_pipeline); });
@@ -76,9 +79,10 @@ int main_00_triangle() {
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+        begin_imgui_frame();
         draw_frame(logical_device.device, swapchain.swapchain, logical_device.graphics_queue, logical_device.present_queue,
                    command_buffers[0], render_pass, framebuffers, swapchain.extent, graphics_pipeline.pipeline,
-                   sync, vertex_buffer.buffer, static_cast<uint32_t>(vertices.size()));
+                   sync, vertex_buffer.buffer, static_cast<uint32_t>(vertices.size()), render_imgui_frame);
     }
 
     vkDeviceWaitIdle(logical_device.device);

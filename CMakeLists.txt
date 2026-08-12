@@ -32,6 +32,28 @@ FetchContent_Declare(vma
 
 FetchContent_MakeAvailable(glfw glm vma)
 
+FetchContent_Declare(imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        v1.91.9  # pin une version précise plutôt que "docking" en HEAD
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(imgui)
+
+add_library(imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+)
+target_include_directories(imgui PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+)
+target_link_libraries(imgui PUBLIC Vulkan::Vulkan glfw)
+
 find_program(GLSLC glslc HINTS "$ENV{VULKAN_SDK}/bin" REQUIRED)
 
 set(SHADER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/shaders")
@@ -73,6 +95,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Vulkan::Vulkan
     glfw
     glm::glm
+    imgui
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE

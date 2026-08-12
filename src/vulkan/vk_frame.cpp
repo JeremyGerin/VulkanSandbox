@@ -2,7 +2,7 @@
 #include "vulkan/vk_command.hpp"
 #include <iostream>
 
-void draw_frame(VkDevice device, VkSwapchainKHR swapchain, VkQueue graphics_queue, VkQueue present_queue, VkCommandBuffer command_buffer, VkRenderPass render_pass, const std::vector<VkFramebuffer>& framebuffers, VkExtent2D extent, VkPipeline pipeline, const SyncObjects& sync, VkBuffer vertex_buffer, uint32_t vertex_count) {
+void draw_frame(VkDevice device, VkSwapchainKHR swapchain, VkQueue graphics_queue, VkQueue present_queue, VkCommandBuffer command_buffer, VkRenderPass render_pass, const std::vector<VkFramebuffer>& framebuffers, VkExtent2D extent, VkPipeline pipeline, const SyncObjects& sync, VkBuffer vertex_buffer, uint32_t vertex_count, const std::function<void(VkCommandBuffer)>& extra_draw) {
     vkWaitForFences(device, 1, &sync.in_flight_fence, VK_TRUE, UINT64_MAX);
     vkResetFences(device, 1, &sync.in_flight_fence);
 
@@ -10,7 +10,7 @@ void draw_frame(VkDevice device, VkSwapchainKHR swapchain, VkQueue graphics_queu
     vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, sync.image_available_semaphore, VK_NULL_HANDLE, &image_index);
 
     vkResetCommandBuffer(command_buffer, 0);
-    record_command_buffer(command_buffer, render_pass, framebuffers[image_index], extent, pipeline, vertex_buffer, vertex_count);
+    record_command_buffer(command_buffer, render_pass, framebuffers[image_index], extent, pipeline, vertex_buffer, vertex_count, extra_draw);
 
     VkSemaphore wait_semaphores[] = { sync.image_available_semaphore };
     VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };

@@ -1,9 +1,8 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <vector>
+#include "vk_context.hpp"
 #include "vk_swapchain.hpp"
 
-std::vector<VkFramebuffer> create_framebuffers(VkDevice device, VkRenderPass render_pass, const Swapchain& swapchain);
-
-void destroy_framebuffers(VkDevice device, const std::vector<VkFramebuffer>& framebuffers);
+bool create_framebuffers(VulkanContext& ctx, SwapchainContext& swpch_ctx);
+void destroy_framebuffers(VulkanContext& ctx, SwapchainContext& swpch_ctx);

@@ -1,4 +1,6 @@
 #include "vulkan/vk_instance.hpp"
+
+#include "vulkan/vk_context.hpp"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <cstring>
@@ -53,10 +55,10 @@ std::vector<const char*> get_required_extensions() {
     return extensions;
 }
 
-VkInstance create_instance(const char* app_name) {
+bool create_instance(VulkanContext& ctx, const char* app_name) {
     if (!check_validation_layer_support()) {
         std::cerr << "Validation layers demandees mais non disponibles\n";
-        return VK_NULL_HANDLE;
+        return false;
     }
 
     VkApplicationInfo app_info{};
@@ -77,21 +79,29 @@ VkInstance create_instance(const char* app_name) {
     create_info.enabledLayerCount = static_cast<uint32_t>(kValidationLayers.size());
     create_info.ppEnabledLayerNames = kValidationLayers.data();
 
-    VkInstance instance = VK_NULL_HANDLE;
-    if (vkCreateInstance(&create_info, nullptr, &instance) != VK_SUCCESS) {
+    if (vkCreateInstance(&create_info, nullptr, &ctx.instance) != VK_SUCCESS) {
         std::cerr << "Echec de la creation de l'instance Vulkan\n";
-        return VK_NULL_HANDLE;
+        return false;
     }
 
-    return instance;
+    return true;
+}
+
+void destroy_instance(VulkanContext& ctx) {
+    if (ctx.instance != VK_NULL_HANDLE) {
+        return;
+    }
+
+    vkDestroyInstance(ctx.instance, nullptr);
+    ctx.instance = VK_NULL_HANDLE;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
     std::cerr << "[Validation layer] " << callback_data->pMessage << "\n";
-    return VK_FALSE; // ne pas interrompre l'appel Vulkan a l'origine du message
+    return VK_FALSE; 
 }
 
-VkDebugUtilsMessengerEXT setup_debug_messenger(VkInstance instance) {
+bool setup_debug_messenger(VulkanContext& ctx) {
     VkDebugUtilsMessengerCreateInfoEXT create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     create_info.messageSeverity =
@@ -104,22 +114,27 @@ VkDebugUtilsMessengerEXT setup_debug_messenger(VkInstance instance) {
     create_info.pfnUserCallback = debug_callback;
 
     auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
-        vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+        vkGetInstanceProcAddr(ctx.instance, "vkCreateDebugUtilsMessengerEXT"));
 
-    VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
-    if (!func || func(instance, &create_info, nullptr, &messenger) != VK_SUCCESS) {
+    if (!func || func(ctx.instance, &create_info, nullptr, &ctx.debug_messenger) != VK_SUCCESS) {
         std::cerr << "Echec de la creation du debug messenger\n";
-        return VK_NULL_HANDLE;
+        return false;
     }
 
-    return messenger;
+    return true;
 }
 
-void destroy_debug_messenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger) {
+void destroy_debug_messenger(VulkanContext& ctx) {
+    if (ctx.debug_messenger != VK_NULL_HANDLE) {
+        return;
+    }
+
     auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-        vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+        vkGetInstanceProcAddr(ctx.instance, "vkDestroyDebugUtilsMessengerEXT"));
 
     if (func) {
-        func(instance, messenger, nullptr);
+        func(ctx.instance, ctx.debug_messenger, nullptr);
     }
+
+    ctx.debug_messenger = VK_NULL_HANDLE;
 }

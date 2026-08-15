@@ -1,9 +1,9 @@
 #include "vulkan/vk_render_pass.hpp"
 #include <iostream>
 
-VkRenderPass create_render_pass(VkDevice device, VkFormat swapchain_format) {
+bool create_render_pass(VulkanContext& ctx, SwapchainContext& swpch_ctx) {
     VkAttachmentDescription color_attachment{};
-    color_attachment.format = swapchain_format;
+    color_attachment.format = swpch_ctx.format;
     color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -13,7 +13,7 @@ VkRenderPass create_render_pass(VkDevice device, VkFormat swapchain_format) {
     color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
     VkAttachmentReference color_attachment_ref{};
-    color_attachment_ref.attachment = 0; // index dans le tableau d'attachments
+    color_attachment_ref.attachment = 0;
     color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpass{};
@@ -38,11 +38,17 @@ VkRenderPass create_render_pass(VkDevice device, VkFormat swapchain_format) {
     render_pass_info.dependencyCount = 1;
     render_pass_info.pDependencies = &dependency;
 
-    VkRenderPass render_pass = VK_NULL_HANDLE;
-    if (vkCreateRenderPass(device, &render_pass_info, nullptr, &render_pass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(ctx.logical_device, &render_pass_info, nullptr, &swpch_ctx.render_pass) != VK_SUCCESS) {
         std::cerr << "Echec de la creation du render pass\n";
-        return VK_NULL_HANDLE;
+        return false;
     }
 
-    return render_pass;
+    return true;
+}
+
+void destroy_render_pass(VulkanContext& ctx, SwapchainContext& swpch_ctx) {
+    if (swpch_ctx.render_pass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(ctx.logical_device, swpch_ctx.render_pass, nullptr);
+        swpch_ctx.render_pass = VK_NULL_HANDLE;
+    }
 }

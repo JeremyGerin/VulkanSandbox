@@ -1,9 +1,8 @@
 #include "vulkan/vk_pipeline.hpp"
 #include <iostream>
 #include <fstream>
-#include <vector>
 
-std::vector<char> read_file(const std::string& path) {
+static std::vector<char> read_file(const std::string& path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
 
     if (!file.is_open()) {
@@ -41,40 +40,15 @@ VkShaderModule create_shader_module(VkDevice device, const std::string& spv_path
     return shader_module;
 }
 
-VkVertexInputBindingDescription get_vertex2d_color_binding_description() {
-    VkVertexInputBindingDescription binding{};
-    binding.binding = 0;
-    binding.stride = sizeof(Vertex2DColor);
-    binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    return binding;
-}
-
-std::array<VkVertexInputAttributeDescription, 2> get_vertex2d_color_attribute_descriptions() {
-    std::array<VkVertexInputAttributeDescription, 2> attributes{};
-
-    attributes[0].binding = 0;
-    attributes[0].location = 0;
-    attributes[0].format = VK_FORMAT_R32G32_SFLOAT; // vec2
-    attributes[0].offset = offsetof(Vertex2DColor, pos);
-
-    attributes[1].binding = 0;
-    attributes[1].location = 1;
-    attributes[1].format = VK_FORMAT_R32G32B32_SFLOAT; // vec3
-    attributes[1].offset = offsetof(Vertex2DColor, color);
-
-    return attributes;
-}
-
-GraphicsPipeline create_graphics_pipeline(VkDevice device, VkRenderPass render_pass, VkExtent2D swapchain_extent) {
-    GraphicsPipeline result{};
-
-    VkShaderModule vert_module = create_shader_module(device, std::string(SHADER_DIR) + "triangle.vert.spv");
-    VkShaderModule frag_module = create_shader_module(device, std::string(SHADER_DIR) + "triangle.frag.spv");
+bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, const PipelineInfo& info) {
+    VkShaderModule vert_module = create_shader_module(ctx.logical_device, info.vertex_shader_path);
+    VkShaderModule frag_module = create_shader_module(ctx.logical_device, info.fragment_shader_path);
 
     if (vert_module == VK_NULL_HANDLE || frag_module == VK_NULL_HANDLE) {
         std::cerr << "Echec du chargement des shaders\n";
-        result.pipeline = VK_NULL_HANDLE;
-        return result;
+        if (vert_module != VK_NULL_HANDLE) vkDestroyShaderModule(ctx.logical_device, vert_module, nullptr);
+        if (frag_module != VK_NULL_HANDLE) vkDestroyShaderModule(ctx.logical_device, frag_module, nullptr);
+        return false;
     }
 
     VkPipelineShaderStageCreateInfo vert_stage_info{};
@@ -91,39 +65,32 @@ GraphicsPipeline create_graphics_pipeline(VkDevice device, VkRenderPass render_p
 
     VkPipelineShaderStageCreateInfo shader_stages[] = { vert_stage_info, frag_stage_info };
 
-    VkVertexInputBindingDescription binding_description = get_vertex2d_color_binding_description();
-    std::array<VkVertexInputAttributeDescription, 2> attribute_descriptions = get_vertex2d_color_attribute_descriptions();
-
     VkPipelineVertexInputStateCreateInfo vertex_input_info{};
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input_info.vertexBindingDescriptionCount = 1;
-    vertex_input_info.pVertexBindingDescriptions = &binding_description;
-    vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descriptions.size());
-    vertex_input_info.pVertexAttributeDescriptions = attribute_descriptions.data();
+    vertex_input_info.pVertexBindingDescriptions = &info.binding_description;
+    vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(info.attribute_descriptions.size());
+    vertex_input_info.pVertexAttributeDescriptions = info.attribute_descriptions.data();
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly{};
     input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     input_assembly.primitiveRestartEnable = VK_FALSE;
 
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(swapchain_extent.width);
-    viewport.height = static_cast<float>(swapchain_extent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = swapchain_extent;
-
     VkPipelineViewportStateCreateInfo viewport_state{};
     viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewport_state.viewportCount = 1;
-    viewport_state.pViewports = &viewport;
     viewport_state.scissorCount = 1;
-    viewport_state.pScissors = &scissor;
+
+    VkDynamicState dynamic_states[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamic_state{};
+    dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamic_state.dynamicStateCount = static_cast<uint32_t>(std::size(dynamic_states));
+    dynamic_state.pDynamicStates = dynamic_states;
 
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -156,12 +123,11 @@ GraphicsPipeline create_graphics_pipeline(VkDevice device, VkRenderPass render_p
     layout_info.setLayoutCount = 0;
     layout_info.pushConstantRangeCount = 0;
 
-    if (vkCreatePipelineLayout(device, &layout_info, nullptr, &result.layout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(ctx.logical_device, &layout_info, nullptr, &ctx.pipeline_layout) != VK_SUCCESS) {
         std::cerr << "Echec de la creation du pipeline layout\n";
-        vkDestroyShaderModule(device, frag_module, nullptr);
-        vkDestroyShaderModule(device, vert_module, nullptr);
-        result.pipeline = VK_NULL_HANDLE;
-        return result;
+        vkDestroyShaderModule(ctx.logical_device, frag_module, nullptr);
+        vkDestroyShaderModule(ctx.logical_device, vert_module, nullptr);
+        return false;
     }
 
     VkGraphicsPipelineCreateInfo pipeline_info{};
@@ -174,23 +140,34 @@ GraphicsPipeline create_graphics_pipeline(VkDevice device, VkRenderPass render_p
     pipeline_info.pRasterizationState = &rasterizer;
     pipeline_info.pMultisampleState = &multisampling;
     pipeline_info.pColorBlendState = &color_blending;
-    pipeline_info.layout = result.layout;
-    pipeline_info.renderPass = render_pass;
+    pipeline_info.pDynamicState = &dynamic_state;
+    pipeline_info.layout = ctx.pipeline_layout;
+    pipeline_info.renderPass = swpch_ctx.render_pass;
     pipeline_info.subpass = 0;
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &result.pipeline) != VK_SUCCESS) {
+    bool ok = true;
+    if (vkCreateGraphicsPipelines(ctx.logical_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &ctx.graphics_pipeline) != VK_SUCCESS) {
         std::cerr << "Echec de la creation du pipeline graphique\n";
-        vkDestroyPipelineLayout(device, result.layout, nullptr);
-        result.pipeline = VK_NULL_HANDLE;
+        vkDestroyPipelineLayout(ctx.logical_device, ctx.pipeline_layout, nullptr);
+        ctx.pipeline_layout = VK_NULL_HANDLE;
+        ctx.graphics_pipeline = VK_NULL_HANDLE;
+        ok = false;
     }
 
-    vkDestroyShaderModule(device, frag_module, nullptr);
-    vkDestroyShaderModule(device, vert_module, nullptr);
+    vkDestroyShaderModule(ctx.logical_device, frag_module, nullptr);
+    vkDestroyShaderModule(ctx.logical_device, vert_module, nullptr);
 
-    return result;
+    return ok;
 }
 
-void destroy_graphics_pipeline(VkDevice device, const GraphicsPipeline& pipeline) {
-    vkDestroyPipeline(device, pipeline.pipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipeline.layout, nullptr);
+void destroy_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx) {
+    (void)swpch_ctx;
+    if (ctx.graphics_pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(ctx.logical_device, ctx.graphics_pipeline, nullptr);
+        ctx.graphics_pipeline = VK_NULL_HANDLE;
+    }
+    if (ctx.pipeline_layout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(ctx.logical_device, ctx.pipeline_layout, nullptr);
+        ctx.pipeline_layout = VK_NULL_HANDLE;
+    }
 }

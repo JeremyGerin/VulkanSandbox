@@ -1,17 +1,19 @@
 #pragma once
-
 #include <vulkan/vulkan.h>
-struct GLFWwindow;
 
-struct ImGuiHandles {
-    VkDescriptorPool descriptor_pool;
-};
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 
-ImGuiHandles init_imgui(GLFWwindow* window, VkInstance instance, VkPhysicalDevice physical_device,
-                          VkDevice device, uint32_t graphics_family_index, VkQueue graphics_queue,
-                          VkRenderPass render_pass, uint32_t image_count);
+struct VulkanContext;
+struct SwapchainContext;
+struct Buffer;
 
-void shutdown_imgui(VkDevice device, const ImGuiHandles& handles);
+bool create_imgui(VulkanContext& ctx, SwapchainContext& swpch_ctx);
+void destroy_imgui(VulkanContext& ctx);
 
-void begin_imgui_frame();
-void render_imgui_frame(VkCommandBuffer command_buffer);
+void imgui_new_frame();
+void imgui_end_frame();
+void imgui_draw_callback(VkCommandBuffer cmd);
+
+void draw_vertex_buffer_ui(const Buffer& vertex_buffer);

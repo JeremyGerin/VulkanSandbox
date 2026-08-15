@@ -1,29 +1,30 @@
 #define VMA_IMPLEMENTATION
 #include "vulkan/vk_buffer.hpp"
 #include <iostream>
-#include <cstring>
 
-VmaAllocator create_allocator(VkInstance instance, VkPhysicalDevice physical_device, VkDevice device) {
+bool create_allocator(VulkanContext& ctx) {
     VmaAllocatorCreateInfo allocator_info{};
-    allocator_info.instance = instance;
-    allocator_info.physicalDevice = physical_device;
-    allocator_info.device = device;
+    allocator_info.instance = ctx.instance;
+    allocator_info.physicalDevice = ctx.physical_device;
+    allocator_info.device = ctx.logical_device;
     allocator_info.vulkanApiVersion = VK_API_VERSION_1_3;
 
-    VmaAllocator allocator = nullptr;
-    if (vmaCreateAllocator(&allocator_info, &allocator) != VK_SUCCESS) {
+    if (vmaCreateAllocator(&allocator_info, &ctx.allocator) != VK_SUCCESS) {
         std::cerr << "Echec de la creation de l'allocateur VMA\n";
-        return nullptr;
+        return false;
     }
-    return allocator;
+    return true;
 }
 
-void destroy_allocator(VmaAllocator allocator) {
-    vmaDestroyAllocator(allocator);
+void destroy_allocator(VulkanContext& ctx) {
+    if (ctx.allocator != nullptr) {
+        vmaDestroyAllocator(ctx.allocator);
+        ctx.allocator = nullptr;
+    }
 }
 
-Buffer create_buffer(VmaAllocator allocator, VkDeviceSize size,
-                       VkBufferUsageFlags usage, VmaMemoryUsage memory_usage) {
+bool create_buffer(VulkanContext& ctx, VkDeviceSize size,
+                    VkBufferUsageFlags usage, VmaMemoryUsage memory_usage, Buffer& out_buffer) {
     VkBufferCreateInfo buffer_info{};
     buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_info.size = size;
@@ -34,27 +35,59 @@ Buffer create_buffer(VmaAllocator allocator, VkDeviceSize size,
     alloc_info.usage = memory_usage;
     alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
-    Buffer result{};
-    if (vmaCreateBuffer(allocator, &buffer_info, &alloc_info, &result.buffer, &result.allocation, nullptr) != VK_SUCCESS) {
+    if (vmaCreateBuffer(ctx.allocator, &buffer_info, &alloc_info, &out_buffer.buffer, &out_buffer.allocation, nullptr) != VK_SUCCESS) {
         std::cerr << "Echec de la creation du buffer\n";
-        result.buffer = VK_NULL_HANDLE;
+        out_buffer.buffer = VK_NULL_HANDLE;
+        out_buffer.allocation = VK_NULL_HANDLE;
+        return false;
     }
-    return result;
+
+    out_buffer.size_bytes = size;
+
+    return true;
 }
 
-void destroy_buffer(VmaAllocator allocator, const Buffer& buffer) {
-    vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
+void destroy_buffer(VulkanContext& ctx, Buffer& buffer) {
+    if (buffer.buffer != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(ctx.allocator, buffer.buffer, buffer.allocation);
+        buffer.buffer = VK_NULL_HANDLE;
+        buffer.allocation = VK_NULL_HANDLE;
+    }
 }
 
-Buffer create_vertex_buffer(VmaAllocator allocator, const std::vector<Vertex2DColor>& vertices) {
-    VkDeviceSize size = sizeof(Vertex2DColor) * vertices.size();
+bool create_index_buffer(VulkanContext& ctx, const std::vector<uint32_t>& indices,
+                          VkIndexType index_type, Buffer& out_buffer) {
+    const void* src_data = nullptr;
+    VkDeviceSize size = 0;
 
-    Buffer buffer = create_buffer(allocator, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO);
+    // Conversion en uint16_t seulement si demandé explicitement
+    std::vector<uint16_t> indices_16;
+    if (index_type == VK_INDEX_TYPE_UINT16) {
+        indices_16.reserve(indices.size());
+        for (uint32_t i : indices) {
+            indices_16.push_back(static_cast<uint16_t>(i));
+        }
+        src_data = indices_16.data();
+        size = sizeof(uint16_t) * indices_16.size();
+    } else {
+        src_data = indices.data();
+        size = sizeof(uint32_t) * indices.size();
+    }
+
+    if (!create_buffer(ctx, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO, out_buffer)) {
+        return false;
+    }
 
     void* data = nullptr;
-    vmaMapMemory(allocator, buffer.allocation, &data);
-    std::memcpy(data, vertices.data(), static_cast<size_t>(size));
-    vmaUnmapMemory(allocator, buffer.allocation);
+    if (vmaMapMemory(ctx.allocator, out_buffer.allocation, &data) != VK_SUCCESS) {
+        destroy_buffer(ctx, out_buffer);
+        return false;
+    }
+    std::memcpy(data, src_data, static_cast<size_t>(size));
+    vmaUnmapMemory(ctx.allocator, out_buffer.allocation);
 
-    return buffer;
+    out_buffer.count = static_cast<uint32_t>(indices.size());
+    out_buffer.index_type = index_type;
+
+    return true;
 }

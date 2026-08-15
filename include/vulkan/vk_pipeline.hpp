@@ -8,6 +8,11 @@
 
 VkShaderModule create_shader_module(VkDevice device, const std::string& spv_path);
 
+struct GraphicsPipeline {
+    VkPipelineLayout layout = VK_NULL_HANDLE;
+    VkPipeline pipeline = VK_NULL_HANDLE;
+};
+
 struct PipelineInfo {
     std::string vertex_shader_path;
     std::string fragment_shader_path;
@@ -15,5 +20,5 @@ struct PipelineInfo {
     std::vector<VkVertexInputAttributeDescription> attribute_descriptions;
 };
 
-bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, const PipelineInfo& info);
-void destroy_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx);
+bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, const PipelineInfo& info, GraphicsPipeline& out_pipeline);
+void destroy_graphics_pipeline(VulkanContext& ctx, GraphicsPipeline& pipeline);

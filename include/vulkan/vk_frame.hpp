@@ -6,6 +6,7 @@
 #include "vulkan/vk_context.hpp"
 #include "vulkan/vk_swapchain.hpp"
 #include "vulkan/vk_buffer.hpp"
+#include "vulkan/vk_pipeline.hpp"
 
 constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -26,7 +27,6 @@ void destroy_sync_objects(VulkanContext& ctx, FrameContext& frame_ctx);
 bool create_frame_context(VulkanContext& ctx, FrameContext& frame_ctx, uint32_t count);
 void destroy_frame_context(VulkanContext& ctx, FrameContext& frame_ctx);
 
-using DrawCallback = std::function<void(VkCommandBuffer, VulkanContext&, const Buffer&, const Buffer&)>;
-using ExtraDrawCallback = std::function<void(VkCommandBuffer)>;
+using DrawCallback = std::function<void(VkCommandBuffer)>;
 
-bool draw_frame(VulkanContext& ctx, SwapchainContext& swpch_ctx, FrameContext& frame_ctx, const Buffer& vertex_buffer, const Buffer& index_buffer, const DrawCallback& draw, const ExtraDrawCallback& extra_draw = {});
+bool draw_frame(VulkanContext& ctx, SwapchainContext& swpch_ctx, FrameContext& frame_ctx, const DrawCallback& draw, const DrawCallback& extra_draw = {});

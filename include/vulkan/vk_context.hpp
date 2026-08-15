@@ -30,8 +30,6 @@ struct VulkanContext {
     VkQueue present_queue = VK_NULL_HANDLE;
     VkQueue compute_queue = VK_NULL_HANDLE;
     VkCommandPool command_pool = VK_NULL_HANDLE;
-    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
-    VkPipeline graphics_pipeline = VK_NULL_HANDLE;
     VmaAllocator allocator = nullptr;
     VkDescriptorPool imgui_descriptor_pool = VK_NULL_HANDLE;
 };

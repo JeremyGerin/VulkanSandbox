@@ -13,6 +13,6 @@ struct Vertex2DColor {
 VkVertexInputBindingDescription get_vertex2d_color_binding_description();
 std::vector<VkVertexInputAttributeDescription> get_vertex2d_color_attribute_descriptions();
 
-void draw_callback(VkCommandBuffer cmd, VulkanContext& ctx, const Buffer& vb, const Buffer& ib);
+void draw_triangle(VkCommandBuffer cmd, const GraphicsPipeline& pipeline, const Buffer& vb, const Buffer& ib);
 
 int main_00_triangle();

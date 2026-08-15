@@ -90,8 +90,7 @@ void destroy_frame_context(VulkanContext& ctx, FrameContext& frame_ctx) {
     destroy_command_buffers(ctx, frame_ctx);
 }
 
-bool draw_frame(VulkanContext& ctx, SwapchainContext& swpch_ctx, FrameContext& frame_ctx, const Buffer& vertex_buffer, const Buffer& index_buffer, const DrawCallback& draw, const ExtraDrawCallback& extra_draw
-) {
+bool draw_frame(VulkanContext& ctx, SwapchainContext& swpch_ctx, FrameContext& frame_ctx, const DrawCallback& draw, const DrawCallback& extra_draw) {
     VkFence current_fence = frame_ctx.in_flight_fences[frame_ctx.current_frame];
     VkSemaphore current_image_available = frame_ctx.image_available_semaphores[frame_ctx.current_frame];
 
@@ -156,7 +155,7 @@ bool draw_frame(VulkanContext& ctx, SwapchainContext& swpch_ctx, FrameContext& f
     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
     if (draw) {
-        draw(command_buffer, ctx, vertex_buffer, index_buffer);
+        draw(command_buffer);
     }
 
     if (extra_draw) {

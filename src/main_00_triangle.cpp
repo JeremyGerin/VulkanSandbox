@@ -26,8 +26,8 @@ std::vector<VkVertexInputAttributeDescription> get_vertex2d_color_attribute_desc
     return attributes;
 }
 
-void draw_callback(VkCommandBuffer cmd, VulkanContext& ctx, const Buffer& vb, const Buffer& ib) {
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx.graphics_pipeline);
+void draw_triangle(VkCommandBuffer cmd, const GraphicsPipeline& pipeline, const Buffer& vb, const Buffer& ib) {
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
 
     VkBuffer buffers[] = { vb.buffer };
     VkDeviceSize offsets[] = { 0 };
@@ -43,6 +43,7 @@ int main_00_triangle() {
     FrameContext frame_ctx;
     Buffer vertex_buffer;
     Buffer index_buffer;
+    GraphicsPipeline graphics_pipeline;
 
     std::vector<Vertex2DColor> vertices = {
         { { -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f } }, 
@@ -65,12 +66,16 @@ int main_00_triangle() {
     pipeline_info.attribute_descriptions = get_vertex2d_color_attribute_descriptions();
 
     bool ok = create_vulkan_context(ctx, 1200, 800, "VulkanSandbox") &&
-                create_swapchain_context(ctx, swapchain_ctx) &&
-                create_graphics_pipeline(ctx, swapchain_ctx, pipeline_info) &&
-                create_imgui(ctx, swapchain_ctx) &&
-                create_frame_context(ctx, frame_ctx, static_cast<uint32_t>(swapchain_ctx.framebuffers.size())) &&
-                create_vertex_buffer(ctx, vertices, vertex_buffer) &&
-                create_index_buffer(ctx, indices, VK_INDEX_TYPE_UINT32, index_buffer);
+        create_swapchain_context(ctx, swapchain_ctx) &&
+        create_graphics_pipeline(ctx, swapchain_ctx, pipeline_info, graphics_pipeline) &&
+        create_imgui(ctx, swapchain_ctx) &&
+        create_frame_context(ctx, frame_ctx, static_cast<uint32_t>(swapchain_ctx.framebuffers.size())) &&
+        create_vertex_buffer(ctx, vertices, vertex_buffer) &&
+        create_index_buffer(ctx, indices, VK_INDEX_TYPE_UINT32, index_buffer);
+
+    auto draw = [&](VkCommandBuffer cmd) {
+        draw_triangle(cmd, graphics_pipeline, vertex_buffer, index_buffer);
+    };
 
     if (ok) {
         while (!glfwWindowShouldClose(ctx.window)) {
@@ -80,7 +85,7 @@ int main_00_triangle() {
             draw_vertex_buffer_ui(vertex_buffer);
             imgui_end_frame();
 
-            draw_frame(ctx, swapchain_ctx, frame_ctx, vertex_buffer, index_buffer, draw_callback, imgui_draw_callback);
+            draw_frame(ctx, swapchain_ctx, frame_ctx, draw, imgui_draw_callback);
         }
 
         vkDeviceWaitIdle(ctx.logical_device);
@@ -90,7 +95,7 @@ int main_00_triangle() {
     destroy_buffer(ctx, vertex_buffer);
     destroy_frame_context(ctx, frame_ctx);
     destroy_imgui(ctx);
-    destroy_graphics_pipeline(ctx, swapchain_ctx);
+    destroy_graphics_pipeline(ctx, graphics_pipeline);
     destroy_swapchain_context(ctx, swapchain_ctx);
     destroy_vulkan_context(ctx);
 

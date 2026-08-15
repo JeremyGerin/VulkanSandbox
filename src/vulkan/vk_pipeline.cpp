@@ -40,7 +40,7 @@ VkShaderModule create_shader_module(VkDevice device, const std::string& spv_path
     return shader_module;
 }
 
-bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, const PipelineInfo& info) {
+bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, const PipelineInfo& info, GraphicsPipeline& out_pipeline) {
     VkShaderModule vert_module = create_shader_module(ctx.logical_device, info.vertex_shader_path);
     VkShaderModule frag_module = create_shader_module(ctx.logical_device, info.fragment_shader_path);
 
@@ -123,7 +123,7 @@ bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, c
     layout_info.setLayoutCount = 0;
     layout_info.pushConstantRangeCount = 0;
 
-    if (vkCreatePipelineLayout(ctx.logical_device, &layout_info, nullptr, &ctx.pipeline_layout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(ctx.logical_device, &layout_info, nullptr, &out_pipeline.layout) != VK_SUCCESS) {
         std::cerr << "Echec de la creation du pipeline layout\n";
         vkDestroyShaderModule(ctx.logical_device, frag_module, nullptr);
         vkDestroyShaderModule(ctx.logical_device, vert_module, nullptr);
@@ -141,16 +141,16 @@ bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, c
     pipeline_info.pMultisampleState = &multisampling;
     pipeline_info.pColorBlendState = &color_blending;
     pipeline_info.pDynamicState = &dynamic_state;
-    pipeline_info.layout = ctx.pipeline_layout;
+    pipeline_info.layout = out_pipeline.layout;
     pipeline_info.renderPass = swpch_ctx.render_pass;
     pipeline_info.subpass = 0;
 
     bool ok = true;
-    if (vkCreateGraphicsPipelines(ctx.logical_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &ctx.graphics_pipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(ctx.logical_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &out_pipeline.pipeline) != VK_SUCCESS) {
         std::cerr << "Echec de la creation du pipeline graphique\n";
-        vkDestroyPipelineLayout(ctx.logical_device, ctx.pipeline_layout, nullptr);
-        ctx.pipeline_layout = VK_NULL_HANDLE;
-        ctx.graphics_pipeline = VK_NULL_HANDLE;
+        vkDestroyPipelineLayout(ctx.logical_device, out_pipeline.layout, nullptr);
+        out_pipeline.layout = VK_NULL_HANDLE;
+        out_pipeline.pipeline = VK_NULL_HANDLE;
         ok = false;
     }
 
@@ -160,14 +160,13 @@ bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, c
     return ok;
 }
 
-void destroy_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx) {
-    (void)swpch_ctx;
-    if (ctx.graphics_pipeline != VK_NULL_HANDLE) {
-        vkDestroyPipeline(ctx.logical_device, ctx.graphics_pipeline, nullptr);
-        ctx.graphics_pipeline = VK_NULL_HANDLE;
+void destroy_graphics_pipeline(VulkanContext& ctx, GraphicsPipeline& pipeline) {
+    if (pipeline.pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(ctx.logical_device, pipeline.pipeline, nullptr);
+        pipeline.pipeline = VK_NULL_HANDLE;
     }
-    if (ctx.pipeline_layout != VK_NULL_HANDLE) {
-        vkDestroyPipelineLayout(ctx.logical_device, ctx.pipeline_layout, nullptr);
-        ctx.pipeline_layout = VK_NULL_HANDLE;
+    if (pipeline.layout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(ctx.logical_device, pipeline.layout, nullptr);
+        pipeline.layout = VK_NULL_HANDLE;
     }
 }

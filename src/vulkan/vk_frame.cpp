@@ -36,8 +36,14 @@ bool create_sync_objects(VulkanContext& ctx, FrameContext& frame_ctx, uint32_t s
     fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    bool ok = vkCreateSemaphore(ctx.logical_device, &semaphore_info, nullptr, &frame_ctx.image_available_semaphore) == VK_SUCCESS
-        && vkCreateFence(ctx.logical_device, &fence_info, nullptr, &frame_ctx.in_flight_fence) == VK_SUCCESS;
+    bool ok = true;
+
+    frame_ctx.image_available_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    frame_ctx.in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
+    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+        ok = ok && vkCreateSemaphore(ctx.logical_device, &semaphore_info, nullptr, &frame_ctx.image_available_semaphores[i]) == VK_SUCCESS;
+        ok = ok && vkCreateFence(ctx.logical_device, &fence_info, nullptr, &frame_ctx.in_flight_fences[i]) == VK_SUCCESS;
+    }
 
     frame_ctx.render_finished_semaphores.resize(swapchain_image_count);
     for (uint32_t i = 0; i < swapchain_image_count; ++i) {
@@ -52,10 +58,12 @@ bool create_sync_objects(VulkanContext& ctx, FrameContext& frame_ctx, uint32_t s
 }
 
 void destroy_sync_objects(VulkanContext& ctx, FrameContext& frame_ctx) {
-    if (frame_ctx.image_available_semaphore != VK_NULL_HANDLE) {
-        vkDestroySemaphore(ctx.logical_device, frame_ctx.image_available_semaphore, nullptr);
-        frame_ctx.image_available_semaphore = VK_NULL_HANDLE;
+    for (VkSemaphore sem : frame_ctx.image_available_semaphores) {
+        if (sem != VK_NULL_HANDLE) {
+            vkDestroySemaphore(ctx.logical_device, sem, nullptr);
+        }
     }
+    frame_ctx.image_available_semaphores.clear();
 
     for (VkSemaphore sem : frame_ctx.render_finished_semaphores) {
         if (sem != VK_NULL_HANDLE) {
@@ -64,10 +72,12 @@ void destroy_sync_objects(VulkanContext& ctx, FrameContext& frame_ctx) {
     }
     frame_ctx.render_finished_semaphores.clear();
 
-    if (frame_ctx.in_flight_fence != VK_NULL_HANDLE) {
-        vkDestroyFence(ctx.logical_device, frame_ctx.in_flight_fence, nullptr);
-        frame_ctx.in_flight_fence = VK_NULL_HANDLE;
+    for (VkFence fence : frame_ctx.in_flight_fences) {
+        if (fence != VK_NULL_HANDLE) {
+            vkDestroyFence(ctx.logical_device, fence, nullptr);
+        }
     }
+    frame_ctx.in_flight_fences.clear();
 }
 
 bool create_frame_context(VulkanContext& ctx, FrameContext& frame_ctx, uint32_t count) {
@@ -82,24 +92,26 @@ void destroy_frame_context(VulkanContext& ctx, FrameContext& frame_ctx) {
 
 bool draw_frame(VulkanContext& ctx, SwapchainContext& swpch_ctx, FrameContext& frame_ctx, const Buffer& vertex_buffer, const Buffer& index_buffer, const DrawCallback& draw, const ExtraDrawCallback& extra_draw
 ) {
-    if (vkWaitForFences(ctx.logical_device, 1, &frame_ctx.in_flight_fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+    VkFence current_fence = frame_ctx.in_flight_fences[frame_ctx.current_frame];
+    VkSemaphore current_image_available = frame_ctx.image_available_semaphores[frame_ctx.current_frame];
+
+    if (vkWaitForFences(ctx.logical_device, 1, &current_fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
         return false;
     }
 
     uint32_t image_index = 0;
 
-    VkResult result = vkAcquireNextImageKHR(ctx.logical_device, swpch_ctx.swapchain, UINT64_MAX, frame_ctx.image_available_semaphore, VK_NULL_HANDLE, &image_index);
+    VkResult result = vkAcquireNextImageKHR(ctx.logical_device, swpch_ctx.swapchain, UINT64_MAX, current_image_available, VK_NULL_HANDLE, &image_index);
 
     if (result != VK_SUCCESS) {
         return false;
     }
 
-    if (vkResetFences(ctx.logical_device, 1, &frame_ctx.in_flight_fence) != VK_SUCCESS) {
+    if (vkResetFences(ctx.logical_device, 1, &current_fence) != VK_SUCCESS) {
         return false;
     }
 
-    VkCommandBuffer command_buffer =
-        frame_ctx.command_buffers[image_index];
+    VkCommandBuffer command_buffer = frame_ctx.command_buffers[image_index];
 
     if (vkResetCommandBuffer(command_buffer, 0) != VK_SUCCESS) {
         return false;
@@ -159,7 +171,7 @@ bool draw_frame(VulkanContext& ctx, SwapchainContext& swpch_ctx, FrameContext& f
     }
 
     VkSemaphore wait_semaphores[] = {
-        frame_ctx.image_available_semaphore
+        current_image_available
     };
 
     VkPipelineStageFlags wait_stages[] = {
@@ -180,7 +192,7 @@ bool draw_frame(VulkanContext& ctx, SwapchainContext& swpch_ctx, FrameContext& f
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = signal_semaphores;
 
-    if (vkQueueSubmit(ctx.graphics_queue, 1, &submit_info, frame_ctx.in_flight_fence) != VK_SUCCESS) {
+    if (vkQueueSubmit(ctx.graphics_queue, 1, &submit_info, current_fence) != VK_SUCCESS) {
         std::cerr << "Echec de la soumission du command buffer\n";
         return false;
     }
@@ -203,6 +215,8 @@ bool draw_frame(VulkanContext& ctx, SwapchainContext& swpch_ctx, FrameContext& f
         std::cerr << "Echec de la presentation\n";
         return false;
     }
+
+    frame_ctx.current_frame = (frame_ctx.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 
     return true;
 }

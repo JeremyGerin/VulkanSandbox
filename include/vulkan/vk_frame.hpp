@@ -7,11 +7,14 @@
 #include "vulkan/vk_swapchain.hpp"
 #include "vulkan/vk_buffer.hpp"
 
+constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+
 struct FrameContext {
     std::vector<VkCommandBuffer> command_buffers;
-    VkSemaphore image_available_semaphore = VK_NULL_HANDLE;
+    std::vector<VkSemaphore> image_available_semaphores;
     std::vector<VkSemaphore> render_finished_semaphores;
-    VkFence in_flight_fence = VK_NULL_HANDLE;
+    std::vector<VkFence> in_flight_fences;
+    uint32_t current_frame = 0;
 };
 
 bool create_command_buffers(VulkanContext& ctx, FrameContext& frame_ctx, uint32_t count);

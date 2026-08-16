@@ -91,3 +91,30 @@ bool create_index_buffer(VulkanContext& ctx, const std::vector<uint32_t>& indice
 
     return true;
 }
+
+bool create_uniform_buffer(VulkanContext& ctx, VkDeviceSize size, Buffer& out_buffer) {
+    VkBufferCreateInfo buffer_info{};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size = size;
+    buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo alloc_info{};
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+    alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                      | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    VmaAllocationInfo allocation_info{};
+
+    if (vmaCreateBuffer(ctx.allocator, &buffer_info, &alloc_info, &out_buffer.buffer, &out_buffer.allocation, &allocation_info) != VK_SUCCESS) {
+        std::cerr << "Echec de la creation du uniform buffer\n";
+        out_buffer.buffer = VK_NULL_HANDLE;
+        out_buffer.allocation = VK_NULL_HANDLE;
+        return false;
+    }
+
+    out_buffer.size_bytes = size;
+    out_buffer.mapped_data = allocation_info.pMappedData;
+
+    return true;
+}

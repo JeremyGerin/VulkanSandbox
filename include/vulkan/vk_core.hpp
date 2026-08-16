@@ -12,6 +12,7 @@
 #include "vulkan/vk_pipeline.hpp"
 #include "vulkan/vk_buffer.hpp"
 #include "vulkan/vk_imgui.hpp"
+#include "vulkan/vk_descriptor.hpp"
 
 #include <cstdlib>
 #include <GLFW/glfw3.h>

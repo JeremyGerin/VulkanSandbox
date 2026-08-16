@@ -118,13 +118,34 @@ bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, c
     color_blending.attachmentCount = 1;
     color_blending.pAttachments = &color_blend_attachment;
 
+    out_pipeline.descriptor_set_layout = VK_NULL_HANDLE;
+
+    if (!info.descriptor_bindings.empty()) {
+        VkDescriptorSetLayoutCreateInfo set_layout_info{};
+        set_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        set_layout_info.bindingCount = static_cast<uint32_t>(info.descriptor_bindings.size());
+        set_layout_info.pBindings = info.descriptor_bindings.data();
+
+        if (vkCreateDescriptorSetLayout(ctx.logical_device, &set_layout_info, nullptr, &out_pipeline.descriptor_set_layout) != VK_SUCCESS) {
+            std::cerr << "Echec de la creation du descriptor set layout\n";
+            vkDestroyShaderModule(ctx.logical_device, frag_module, nullptr);
+            vkDestroyShaderModule(ctx.logical_device, vert_module, nullptr);
+            return false;
+        }
+    }
+
     VkPipelineLayoutCreateInfo layout_info{};
     layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layout_info.setLayoutCount = 0;
+    layout_info.setLayoutCount = out_pipeline.descriptor_set_layout != VK_NULL_HANDLE ? 1 : 0;
+    layout_info.pSetLayouts = out_pipeline.descriptor_set_layout != VK_NULL_HANDLE ? &out_pipeline.descriptor_set_layout : nullptr;
     layout_info.pushConstantRangeCount = 0;
 
     if (vkCreatePipelineLayout(ctx.logical_device, &layout_info, nullptr, &out_pipeline.layout) != VK_SUCCESS) {
         std::cerr << "Echec de la creation du pipeline layout\n";
+        if (out_pipeline.descriptor_set_layout != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(ctx.logical_device, out_pipeline.descriptor_set_layout, nullptr);
+            out_pipeline.descriptor_set_layout = VK_NULL_HANDLE;
+        }
         vkDestroyShaderModule(ctx.logical_device, frag_module, nullptr);
         vkDestroyShaderModule(ctx.logical_device, vert_module, nullptr);
         return false;
@@ -150,6 +171,10 @@ bool create_graphics_pipeline(VulkanContext& ctx, SwapchainContext& swpch_ctx, c
         std::cerr << "Echec de la creation du pipeline graphique\n";
         vkDestroyPipelineLayout(ctx.logical_device, out_pipeline.layout, nullptr);
         out_pipeline.layout = VK_NULL_HANDLE;
+        if (out_pipeline.descriptor_set_layout != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(ctx.logical_device, out_pipeline.descriptor_set_layout, nullptr);
+            out_pipeline.descriptor_set_layout = VK_NULL_HANDLE;
+        }
         out_pipeline.pipeline = VK_NULL_HANDLE;
         ok = false;
     }
@@ -168,5 +193,9 @@ void destroy_graphics_pipeline(VulkanContext& ctx, GraphicsPipeline& pipeline) {
     if (pipeline.layout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(ctx.logical_device, pipeline.layout, nullptr);
         pipeline.layout = VK_NULL_HANDLE;
+    }
+    if (pipeline.descriptor_set_layout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(ctx.logical_device, pipeline.descriptor_set_layout, nullptr);
+        pipeline.descriptor_set_layout = VK_NULL_HANDLE;
     }
 }

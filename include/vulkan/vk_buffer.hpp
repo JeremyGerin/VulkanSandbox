@@ -15,6 +15,7 @@ struct Buffer {
     uint32_t count = 0;
     VkDeviceSize size_bytes = 0;
     VkIndexType index_type = VK_INDEX_TYPE_UINT32;
+    void* mapped_data = nullptr;
 };
 
 bool create_buffer(VulkanContext& ctx, VkDeviceSize size,
@@ -43,3 +44,5 @@ bool create_vertex_buffer(VulkanContext& ctx, const std::vector<T>& vertices, Bu
 }
 
 bool create_index_buffer(VulkanContext& ctx, const std::vector<uint32_t>& indices, VkIndexType index_type, Buffer& out_buffer);
+
+bool create_uniform_buffer(VulkanContext& ctx, VkDeviceSize size, Buffer& out_buffer);
